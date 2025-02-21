@@ -23,14 +23,14 @@ def apply_diff_logic_smart(diff_content, original_content, filename=None):
         filename (str, optional): The filename to be patched (for diff parsing only).
 
     Returns:
-        tuple: (success_message, error_message, modified_content_string)
+        tuple: (success_message, warning_message, modified_content_string)
                success_message: str if successful, None otherwise
-               error_message: str if error occurred, None otherwise
+               warning_message: str if warnings occurred, None otherwise (can also be error message in case of fatal error)
                modified_content_string: str of the modified content or None if error
     """
     diff_lines = diff_content.strip().splitlines()
     if not diff_lines:
-        return None, "Error: Empty diff content provided.", None
+        return None, "Error: Empty diff content provided.", None, None # Return None for modified_content in error case
 
     target_filename = None
     hunks = []
@@ -69,7 +69,7 @@ def apply_diff_logic_smart(diff_content, original_content, filename=None):
     for hunk in hunks:
         header_match = re.match(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@.*", hunk["header"])
         if not header_match:
-            return None, f"Warning: Invalid hunk header: '{hunk['header']}'. Skipping hunk.", None
+            return None, f"Warning: Invalid hunk header: '{hunk['header']}'. Skipping hunk.", None, None # Return None for modified_content in error case
 
         original_start_line = int(header_match.group(1))
         original_line_count = int(header_match.group(2)) if header_match.group(2) else 1
@@ -117,9 +117,9 @@ def apply_diff_logic_smart(diff_content, original_content, filename=None):
     modified_content_string = "".join(new_lines)
     if mismatches_warnings:
         warning_message = "Patch applied with potential issues:\n" + "\n".join(mismatches_warnings)
-        return "Patch applied with warnings.", warning_message, modified_content_string
+        return "Patch applied with warnings.", warning_message, modified_content_string, modified_content_string # Return modified_content also in warning case
     else:
-        return "Successfully applied patch.", None, modified_content_string
+        return "Successfully applied patch.", None, modified_content_string, modified_content_string # Return modified_content in success case
 
 
 # --- Display Functions ---
@@ -133,9 +133,9 @@ def display_input_fields():
     filename = st.text_input("Filename (Optional, for reference)", placeholder="Enter filename if needed (or extracted from diff)")
     return original_content, diff_content, filename
 
-def display_output(success_message, warning_message, error_message, modified_content):
-    if error_message:
-        st.error(error_message)
+def display_output(success_message, warning_message, modified_content): # Removed error_message as separate argument
+    if warning_message and "Error:" in warning_message: # Check if warning_message is actually an error
+        st.error(warning_message)
     elif warning_message:
         st.warning(warning_message) # Display warnings in a warning box
         st.success(success_message) # Still show success message if patch applied with warnings
@@ -157,8 +157,8 @@ def main():
         elif not original_content:
             st.error("Please provide original content to patch.")
         else:
-            success_message, warning_message, error_message, modified_content = apply_diff_logic_smart(diff_content, original_content, filename)
-            display_output(success_message, warning_message, error_message, modified_content)
+            success_message, warning_message, modified_content, _ = apply_diff_logic_smart(diff_content, original_content, filename) # Unpack only 3, ignore the 4th return
+            display_output(success_message, warning_message, modified_content) # Pass warning_message as the second argument
 
 
 if __name__ == "__main__":
