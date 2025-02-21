@@ -3,12 +3,13 @@ import re
 import io  # Import io module
 
 # --- Logic Functions ---
-def apply_diff_logic(diff_content, filename=None):
+def apply_diff_logic(diff_content, original_content, filename=None):
     """
-    Applies a unified diff to a file-like string and returns the modified content as a string.
+    Applies a unified diff to a string of original content and returns the modified content as a string.
 
     Args:
         diff_content (str): The content of the diff in unified format.
+        original_content (str): The original content to apply the diff to.
         filename (str, optional): The filename to be patched (for diff parsing only).
 
     Returns:
@@ -49,9 +50,11 @@ def apply_diff_logic(diff_content, filename=None):
 
 
     if not filename and not target_filename:
-        return None, "Error: No target filename found in diff or provided.", None
+        filename = "in-memory-content" # Default filename for in-memory patching
 
-    original_lines = io.StringIO().readlines() # Initialize with empty lines to process diffs for empty files.
+    original_lines = original_content.splitlines(keepends=True) if original_content else [] # Split original content into lines
+
+
     original_line_index = 0
     new_lines = []
 
@@ -105,18 +108,19 @@ def apply_diff_logic(diff_content, filename=None):
         original_line_index += 1
 
     modified_content_string = "".join(new_lines)
-    return "Successfully applied patch.", None, modified_content_string
+    return "Successfully applied patch to in-memory content.", None, modified_content_string
 
 
 # --- Display Functions ---
 def display_header():
     st.title("Diff Patch Applier")
-    st.write("Enter your diff content and optionally a filename to apply the patch.")
+    st.write("Enter your diff content and the original text content to apply the patch.")
 
 def display_input_fields():
+    original_content = st.text_area("Original Content", height=300, placeholder="Paste the original text content here...")
     diff_content = st.text_area("Diff Content", height=300, placeholder="Paste your diff content here...")
-    filename = st.text_input("Filename (Optional)", placeholder="Enter filename if needed (or extracted from diff)")
-    return diff_content, filename
+    filename = st.text_input("Filename (Optional, for reference)", placeholder="Enter filename if needed (or extracted from diff)")
+    return original_content, diff_content, filename
 
 def display_output(success_message, error_message, modified_content):
     if error_message:
@@ -131,13 +135,15 @@ def display_output(success_message, error_message, modified_content):
 # --- Main Streamlit App ---
 def main():
     display_header()
-    diff_content, filename = display_input_fields()
+    original_content, diff_content, filename = display_input_fields()
 
     if st.button("Apply Patch"):
         if not diff_content:
             st.error("Please provide diff content.")
+        elif not original_content:
+            st.error("Please provide original content to patch.")
         else:
-            success_message, error_message, modified_content = apply_diff_logic(diff_content, filename)
+            success_message, error_message, modified_content = apply_diff_logic(diff_content, original_content, filename)
             display_output(success_message, error_message, modified_content)
 
 
